@@ -1,6 +1,7 @@
 // app/api/analyze-video/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/genai';
+// 1. This is the correct import for the new package
+import { GoogleGenAI } from '@google/genai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +13,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Gemini API
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    // 2. This is the correct instantiation
+    const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
     const formData = await request.formData();
     const file = formData.get('video') as File;
@@ -40,30 +41,71 @@ export async function POST(request: NextRequest) {
     const videoData = buffer.toString('base64');
 
     try {
-      // Try different model names - use the one that works for your API key
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+      // 3. This prompt now matches your parsing logic ("transcript" and "analytics")
+      const combinedPrompt = `You are an advanced Meeting Audio Analytics Assistant. 
+Your task is to process the given meeting audio and provide a comprehensive structured analysis. 
+Please ensure the following:
 
-      // Combined prompt for better efficiency (single API call)
-      const combinedPrompt = `Analyze this video and provide your response in the following JSON format:
+1. **Noise Reduction**  
+   - Automatically remove background noise and enhance speech clarity before processing.
 
-{
-  "transcript": "Complete transcription of all spoken content in the video",
-  "analytics": "Detailed analysis including:\\n1. Summary of main topics\\n2. Key themes and subjects\\n3. Sentiment analysis (tone and mood)\\n4. Important keywords and phrases\\n5. Speaker characteristics\\n6. Content categorization\\n7. Actionable insights\\n8. Notable timestamps or segments"
-}
+2. **Speaker Identification & Diarization**  
+   - Identify distinct speakers (label them as User1, User2, etc. if actual IDs are unavailable).  
+   - For each speaker, assign a unique user ID and identify their voice across the meeting.
 
-Important: Return ONLY the JSON object, no additional text or markdown formatting.`;
+3. **Transcript Generation**  
+   - Generate a clean, readable transcript of the conversation.
+   - Include speaker labels and timestamps for each spoken segment.
 
-      const result = await model.generateContent([
+4. **Participant Metrics**  
+   - Calculate total time attended (duration of presence in the recording).  
+   - Calculate total speaking time per participant.  
+   - Perform sentiment analysis for each participant (e.g., Positive, Neutral, Negative).  
+
+5. **Meeting Insights**  
+   - Provide an overall sentiment summary of the meeting.  
+   - Identify key topics discussed.  
+   - Extract any action items or decisions made.
+
+6. **Output Format**  
+   Return your response in a structured JSON-like format:
+   {
+     "summary": "...",
+     "participants": [
         {
-          inlineData: {
-            mimeType: file.type,
-            data: videoData,
-          },
+          "userId": "User1",
+          "speakingTime": "XX minutes",
+          "sentiment": "Positive",
+          "segments": [
+             { "timestamp": "00:02:15", "text": "..." },
+             { "timestamp": "00:04:10", "text": "..." }
+          ]
         },
-        combinedPrompt,
-      ]);
+        ...
+     ],
+     "topics": [...],
+     "actionItems": [...]
+   }
 
-      const responseText = result.response.text();
+Ensure your analysis is clear, structured, and based on the content of the meeting.
+`;
+
+      // 4. This is the new, correct way to call the model
+      const result = await genAI.models.generateContent({
+model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: file.type, data: videoData } },
+              { text: combinedPrompt },
+            ],
+          },
+        ],
+      });
+
+      // 5. The response is in `result.text`, not `result.response.text()`
+      const responseText = result.text;
       
       console.log('Raw API Response:', responseText); // Debug log
       
@@ -78,6 +120,7 @@ Important: Return ONLY the JSON object, no additional text or markdown formattin
       let transcript = '';
       let analytics = '';
       
+      // This parsing logic now correctly matches the new prompt
       try {
         parsedData = JSON.parse(jsonString);
         transcript = parsedData.transcript || '';
