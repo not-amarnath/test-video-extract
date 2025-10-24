@@ -2,9 +2,16 @@
 import { useState } from "react"
 import type React from "react"
 
-import { Upload, FileVideo, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
+import {
+  Upload,
+  FileAudio,
+  FileVideo, // Added
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react"
 
-export default function VideoAnalytics() {
+export default function AudioVideoAnalytics() {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -12,18 +19,23 @@ export default function VideoAnalytics() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
-    if (selectedFile && selectedFile.type.startsWith("video/")) {
+    if (
+      selectedFile &&
+      (selectedFile.type.startsWith("audio/") ||
+        selectedFile.type.startsWith("video/"))
+    ) {
       setFile(selectedFile)
       setError(null)
       setResult(null)
     } else {
-      setError("Please select a valid video file")
+      setFile(null) // Clear previous file if new one is invalid
+      setError("Please select a valid audio or video file")
     }
   }
 
   const handleUpload = async () => {
     if (!file) {
-      setError("Please select a video file first")
+      setError("Please select a file first") // Changed
       return
     }
 
@@ -31,10 +43,26 @@ export default function VideoAnalytics() {
     setError(null)
 
     const formData = new FormData()
-    formData.append("video", file)
+    let endpoint = ""
+    let formDataKey = ""
+
+    // Determine endpoint and form data key based on file type
+    if (file.type.startsWith("audio/")) {
+      endpoint = "/api/analyze-audio"
+      formDataKey = "audio"
+    } else if (file.type.startsWith("video/")) {
+      endpoint = "/api/video-analytics"
+      formDataKey = "video"
+    } else {
+      setError("Invalid file type. Please upload audio or video.")
+      setLoading(false)
+      return
+    }
+
+    formData.append(formDataKey, file)
 
     try {
-      const response = await fetch("/api/analyze-video", {
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
       })
@@ -42,7 +70,7 @@ export default function VideoAnalytics() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to analyze video")
+        throw new Error(data.error || "Failed to analyze file") // Changed
       }
 
       setResult(data)
@@ -57,32 +85,54 @@ export default function VideoAnalytics() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-4">Video Analytics</h1>
-          <p className="text-slate-300 text-lg">Upload a video to get transcription and AI-powered analytics</p>
+          <h1 className="text-5xl font-bold text-white mb-4">
+            Audio & Video Analytics
+          </h1>
+          <p className="text-slate-300 text-lg">
+            Upload an audio or video file to get transcription and AI-powered
+            analytics
+          </p>
         </div>
 
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
           <div className="mb-8">
             <label
-              htmlFor="video-upload"
+              htmlFor="media-upload" // Changed
               className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-purple-400 rounded-xl cursor-pointer bg-white/5 hover:bg-white/10 transition-all duration-300"
             >
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 {file ? (
                   <>
-                    <FileVideo className="w-16 h-16 text-purple-400 mb-4" />
+                    {/* Conditionally render icon */}
+                    {file.type.startsWith("video/") ? (
+                      <FileVideo className="w-16 h-16 text-purple-400 mb-4" />
+                    ) : (
+                      <FileAudio className="w-16 h-16 text-purple-400 mb-4" />
+                    )}
                     <p className="text-white font-medium mb-2">{file.name}</p>
-                    <p className="text-slate-400 text-sm">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                    <p className="text-slate-400 text-sm">
+                      {(file.size / (1024 * 1024)).toFixed(2)} MB
+                    </p>
                   </>
                 ) : (
                   <>
                     <Upload className="w-16 h-16 text-purple-400 mb-4" />
-                    <p className="mb-2 text-white font-medium">Click to upload video</p>
-                    <p className="text-slate-400 text-sm">MP4, MOV, AVI, WebM (Max 100MB)</p>
+                    <p className="mb-2 text-white font-medium">
+                      Click to upload audio or video
+                    </p>
+                    <p className="text-slate-400 text-sm">
+                      Audio (MP3, WAV) or Video (MP4, MOV, etc.)
+                    </p>
                   </>
                 )}
               </div>
-              <input id="video-upload" type="file" className="hidden" accept="video/*" onChange={handleFileChange} />
+              <input
+                id="media-upload" // Changed
+                type="file"
+                className="hidden"
+                accept="audio/*,video/*" // Changed
+                onChange={handleFileChange}
+              />
             </label>
           </div>
 
@@ -99,7 +149,7 @@ export default function VideoAnalytics() {
             ) : (
               <>
                 <Upload className="w-5 h-5" />
-                Analyze Video
+                Analyze File
               </>
             )}
           </button>
@@ -119,26 +169,40 @@ export default function VideoAnalytics() {
               </div>
 
               <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-                <h3 className="text-xl font-semibold text-white mb-4">Transcription</h3>
-                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{result.transcript}</p>
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  Transcription
+                </h3>
+                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  {result.transcript}
+                </p>
               </div>
 
               <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-                <h3 className="text-xl font-semibold text-white mb-4">Analytics & Insights</h3>
-                <div className="text-slate-300 leading-relaxed whitespace-pre-wrap">{result.analytics}</div>
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  Analytics & Insights
+                </h3>
+                <div className="text-slate-300 leading-relaxed whitespace-pre-wrap">
+                  {result.analytics}
+                </div>
               </div>
 
               {result.metadata && (
                 <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-                  <h3 className="text-xl font-semibold text-white mb-4">Metadata</h3>
+                  <h3 className="text-xl font-semibold text-white mb-4">
+                    Metadata
+                  </h3>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-slate-400">File Size</p>
-                      <p className="text-white font-medium">{result.metadata.fileSize}</p>
+                      <p className="text-white font-medium">
+                        {result.metadata.fileSize}
+                      </p>
                     </div>
                     <div>
                       <p className="text-slate-400">File Type</p>
-                      <p className="text-white font-medium">{result.metadata.mimeType}</p>
+                      <p className="text-white font-medium">
+                        {result.metadata.mimeType}
+                      </p>
                     </div>
                   </div>
                 </div>

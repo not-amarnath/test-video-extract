@@ -1,4 +1,4 @@
-// app/api/analyze-video/route.ts
+// app/api/analyze-audio/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 // 1. This is the correct import for the new package
 import { GoogleGenAI } from '@google/genai';
@@ -14,23 +14,23 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. This is the correct instantiation
-    const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
+   const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
     const formData = await request.formData();
-    const file = formData.get('video') as File;
+    const file = formData.get('audio') as File;
 
     if (!file) {
       return NextResponse.json(
-        { error: 'No video file provided' },
+        { error: 'No audio file provided' },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 20MB for better performance)
-    const maxSize = 20 * 1024 * 1024; // 20MB
+    // Validate file size (max 100MB for better performance)
+    const maxSize = 100 * 1024 * 1024; // 20MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File size too large. Please upload a video smaller than 20MB.' },
+        { error: 'File size too large. Please upload a audio smaller than 20MB.' },
         { status: 400 }
       );
     }
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Convert file to buffer and base64
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const videoData = buffer.toString('base64');
+    const audioData = buffer.toString('base64');
 
     try {
       // 3. This prompt now matches your parsing logic ("transcript" and "analytics")
@@ -50,15 +50,16 @@ Please ensure the following:
    - Automatically remove background noise and enhance speech clarity before processing.
 
 2. **Speaker Identification & Diarization**  
-   - Identify distinct speakers (label them as User1, User2, etc. if actual IDs are unavailable).  
-   - For each speaker, assign a unique user ID and identify their voice across the meeting.
+   - Identify distinct speakers using on-screen names detected from the meeting audio (e.g., participant name overlays or captions).  
+   - If on-screen names are unavailable, assign unique placeholder labels (e.g., Speaker 1, Speaker 2).  
+   - Ensure that each speaker's voice is consistently linked to their identified or detected name throughout the meeting.
 
 3. **Transcript Generation**  
-   - Generate a clean, readable transcript of the conversation.
-   - Include speaker labels and timestamps for each spoken segment.
+   - Generate a clean, readable transcript of the conversation.  
+   - Include speaker names and timestamps for each spoken segment.
 
 4. **Participant Metrics**  
-   - Calculate total time attended (duration of presence in the recording).  
+   - Calculate total meeting presence duration for each participant.  
    - Calculate total speaking time per participant.  
    - Perform sentiment analysis for each participant (e.g., Positive, Neutral, Negative).  
 
@@ -73,8 +74,8 @@ Please ensure the following:
      "summary": "...",
      "participants": [
         {
-          "userId": "User1",
-          "speakingTime": "XX minutes",
+          "name": "Priya Sharma",
+          "speakingTime": "12 minutes",
           "sentiment": "Positive",
           "segments": [
              { "timestamp": "00:02:15", "text": "..." },
@@ -87,17 +88,17 @@ Please ensure the following:
      "actionItems": [...]
    }
 
-Ensure your analysis is clear, structured, and based on the content of the meeting.
-`;
+Ensure your analysis is accurate, structured, and uses the participant names visible on the meeting screen when available.`;
+
 
       // 4. This is the new, correct way to call the model
       const result = await genAI.models.generateContent({
-model: 'gemini-2.5-flash',
+         model: 'gemini-2.5-flash',
         contents: [
           {
             role: 'user',
             parts: [
-              { inlineData: { mimeType: file.type, data: videoData } },
+              { inlineData: { mimeType: file.type, data: audioData } },
               { text: combinedPrompt },
             ],
           },
@@ -112,7 +113,7 @@ model: 'gemini-2.5-flash',
       // Clean up response text (remove markdown code blocks if present)
       let jsonString = responseText.trim();
       jsonString = jsonString.replace(/^```json\s*\n?/, '');
-      jsonString = jsonString.replace(/^```\s*\n?/, ''); // Also try without 'json'
+      jsonString = jsonString.replace(/^```\s*\n?/, ''); 
       jsonString = jsonString.replace(/\n?```\s*$/, '');
       jsonString = jsonString.trim();
 
@@ -140,7 +141,7 @@ model: 'gemini-2.5-flash',
           } catch (e) {
             // Still failed, use the raw text split approach
             transcript = responseText;
-            analytics = 'Unable to generate structured analytics. Please try with a different video or check the transcript above.';
+            analytics = 'Unable to generate structured analytics. Please try with a different audio or check the transcript above.';
           }
         } else {
           // No JSON found, split the response
@@ -165,10 +166,10 @@ model: 'gemini-2.5-flash',
       throw error;
     }
   } catch (error: any) {
-    console.error('Error processing video:', error);
+    console.error('Error processing audio:', error);
     return NextResponse.json(
       {
-        error: error.message || 'Failed to process video',
+        error: error.message || 'Failed to process audio',
         details: error.toString(),
       },
       { status: 500 }
