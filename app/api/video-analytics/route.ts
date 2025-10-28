@@ -74,7 +74,7 @@ Your objectives:
      - High weight → visually consistent name overlay.
      - Medium → spoken confirmation.
      - Low → inferred context.
-   - For ambiguous or duplicate matches, mark with `"verified": false`.
+   - For ambiguous or duplicate matches, mark with "verified": false.
 
 ---
 
@@ -182,11 +182,10 @@ Return the response in this JSON structure:
   ]
 }
 
----
 
 ### ⚙️ QUALITY & ACCURACY RULES
 - Use **only verified names** for final labeling.
-- Mark `"verified": false` for uncertain matches.
+- Mark "verified": false for uncertain matches.
 - Ensure all timestamps are synchronized (hh:mm:ss).
 - Summaries should be **concise yet informative**, written in natural language.
 - Avoid hallucinated names or events.
